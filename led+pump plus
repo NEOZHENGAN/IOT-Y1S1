@@ -1,0 +1,89 @@
+/* FILL IN YOUR TEMPLATE INFO HERE */
+#define BLYNK_TEMPLATE_ID   "TMPL6fSzjY-CY"
+#define BLYNK_TEMPLATE_NAME "Smart Garden Auto"
+#define BLYNK_AUTH_TOKEN    "LNI6Szfb9ilZ991T-m6lr-uEkSRcmife"
+
+#define BLYNK_PRINT Serial
+#include <WiFi.h>
+#include <BlynkSimpleEsp32.h>
+
+char ssid[] = "vivo Y36 5";
+char pass[] = "oado200693";
+
+// --- PINS ---
+#define PIN_RELAY_LED   26   // Relay 1: Controls Grow Light
+#define PIN_RELAY_PUMP  27   // Relay 2: Controls Water Pump
+#define PIN_LDR         34   // LDR Sensor
+#define PIN_MOISTURE    35   // Moisture Sensor
+
+// --- SETTINGS ---
+int lightThreshold = 2000;   // If < 2000 (Dark) -> Light ON
+int dryThreshold = 3000;     // If > 3000 (Dry)  -> Pump ON
+
+// --- RELAY LOGIC (FIXED) ---
+// HIGH = ON, LOW = OFF (Based on your "Always On" fix)
+int RELAY_ON = HIGH;      
+int RELAY_OFF = LOW;
+
+BlynkTimer timer;
+
+// --- AUTOMATION LOOP (Runs every 1 second) ---
+void myTimerEvent()
+{
+  // 1. Read Sensors
+  int ldrValue = analogRead(PIN_LDR);
+  int moistureValue = analogRead(PIN_MOISTURE);
+
+  // 2. Send Data to App
+  Blynk.virtualWrite(V0, ldrValue);      // Light Gauge
+  Blynk.virtualWrite(V4, moistureValue); // Moisture Gauge
+
+  Serial.print("Light: "); Serial.print(ldrValue);
+  Serial.print(" | Soil: "); Serial.println(moistureValue);
+
+  // --- JOB A: LIGHT CONTROL (Always Active) ---
+  // If it is Dark (Value < 2000) -> Turn LED ON
+  if (ldrValue < lightThreshold) {
+    digitalWrite(PIN_RELAY_LED, RELAY_ON);
+    Serial.println(" -> Dark: LED ON");
+  } else {
+    digitalWrite(PIN_RELAY_LED, RELAY_OFF);
+    Serial.println(" -> Bright: LED OFF");
+  }
+
+  // --- JOB B: PUMP CONTROL (Always Active) ---
+  // If Soil is Dry (Value > 3000) -> Turn Pump ON
+  if (moistureValue > dryThreshold) {
+    digitalWrite(PIN_RELAY_PUMP, RELAY_ON);
+    Serial.println(" -> Soil Dry: PUMP ON");
+  } else {
+    digitalWrite(PIN_RELAY_PUMP, RELAY_OFF);
+    Serial.println(" -> Soil Wet: PUMP OFF");
+  }
+}
+
+void setup()
+{
+  Serial.begin(9600);
+  
+  // Configure Output Pins (Relays)
+  pinMode(PIN_RELAY_LED, OUTPUT);
+  pinMode(PIN_RELAY_PUMP, OUTPUT);
+  
+  // Configure Input Pins (Sensors)
+  pinMode(PIN_LDR, INPUT);
+  pinMode(PIN_MOISTURE, INPUT);
+  
+  // Start with everything OFF
+  digitalWrite(PIN_RELAY_LED, RELAY_OFF); 
+  digitalWrite(PIN_RELAY_PUMP, RELAY_OFF);
+
+  Blynk.begin(BLYNK_AUTH_TOKEN, ssid, pass);
+  timer.setInterval(1000L, myTimerEvent);
+}
+
+void loop()
+{
+  Blynk.run();
+  timer.run();
+}
