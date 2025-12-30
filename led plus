@@ -42,7 +42,7 @@ void myTimerEvent()
 
   // --- THE NEW LOGIC (DARK DETECT) ---
   // If System is ON ... AND ... Value is LESS than threshold (Dark)
-  if (systemArmed == true && ldrValue < threshold) 
+  if ( ldrValue < threshold) 
   {
     digitalWrite(PIN_RELAY, RELAY_ON);
     Serial.println(" -> It is DARK! Turning LED ON.");
