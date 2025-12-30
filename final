@@ -1,0 +1,99 @@
+/* FILL IN YOUR TEMPLATE INFO HERE */
+#define BLYNK_TEMPLATE_ID   "TMPL6fSzjY-CY"
+#define BLYNK_TEMPLATE_NAME "Smart Garden Auto"
+#define BLYNK_AUTH_TOKEN    "LNI6Szfb9ilZ991T-m6lr-uEkSRcmife"
+
+#define BLYNK_PRINT Serial
+#include <WiFi.h>
+#include <BlynkSimpleEsp32.h>
+
+char ssid[] = "vivo Y36 5";
+char pass[] = "oado200693";
+
+// --- PINS ---
+#define PIN_RELAY_LED   26   // Relay 1: Controls Grow Light
+#define PIN_RELAY_PUMP  27   // Relay 2: Controls Water Pump
+#define PIN_LDR         34   // LDR Sensor (Input)
+#define PIN_MOISTURE    35   // Moisture Sensor (Input)
+#define PIN_GAS         33   // Gas Sensor (NEW! - Connect to Pin 33)
+
+// --- SETTINGS ---
+int lightThreshold = 2000;   // If < 2000 (Dark) -> Light ON
+int dryThreshold = 3000;     // If > 3000 (Dry)  -> Pump ON
+int gasThreshold = 2500;     // If > 2500 -> Gas Detected (Adjust this later)
+
+// --- RELAY LOGIC (FIXED) ---
+// HIGH = ON, LOW = OFF (Based on your hardware)
+int RELAY_ON = HIGH;      
+int RELAY_OFF = LOW;
+
+BlynkTimer timer;
+
+// --- AUTOMATION LOOP (Runs every 1 second) ---
+void myTimerEvent()
+{
+  // 1. Read Sensors
+  int ldrValue = analogRead(PIN_LDR);
+  int moistureValue = analogRead(PIN_MOISTURE);
+  int gasValue = analogRead(PIN_GAS); // Read Gas Sensor (0-4095)
+
+  // 2. Send Data to App
+  Blynk.virtualWrite(V0, ldrValue);      // Light Gauge
+  Blynk.virtualWrite(V4, moistureValue); // Moisture Gauge
+  Blynk.virtualWrite(V7, gasValue);      // Gas Gauge (Create V7 in App!)
+
+  Serial.print("Light: "); Serial.print(ldrValue);
+  Serial.print(" | Soil: "); Serial.print(moistureValue);
+  Serial.print(" | Gas: "); Serial.println(gasValue);
+
+  // --- JOB A: LIGHT CONTROL ---
+  if (ldrValue < lightThreshold) {
+    digitalWrite(PIN_RELAY_LED, RELAY_ON);
+    Serial.println(" -> Dark: LED ON");
+  } else {
+    digitalWrite(PIN_RELAY_LED, RELAY_OFF);
+    Serial.println(" -> Bright: LED OFF");
+  }
+
+  // --- JOB B: PUMP CONTROL ---
+  if (moistureValue > dryThreshold) {
+    digitalWrite(PIN_RELAY_PUMP, RELAY_ON);
+    Serial.println(" -> Soil Dry: PUMP ON");
+  } else {
+    digitalWrite(PIN_RELAY_PUMP, RELAY_OFF);
+    Serial.println(" -> Soil Wet: PUMP OFF");
+  }
+  
+  // --- JOB C: GAS MONITORING (Optional Alarm) ---
+  if (gasValue > gasThreshold) {
+    Serial.println(" -> ⚠️ WARNING: High Gas/CO2 Detected!");
+    // You can add a buzzer here later if you want
+  }
+}
+
+void setup()
+{
+  Serial.begin(9600);
+  
+  // Configure Output Pins (Relays)
+  pinMode(PIN_RELAY_LED, OUTPUT);
+  pinMode(PIN_RELAY_PUMP, OUTPUT);
+  
+  // Configure Input Pins (Sensors)
+  pinMode(PIN_LDR, INPUT);
+  pinMode(PIN_MOISTURE, INPUT);
+  pinMode(PIN_GAS, INPUT); // Set Gas Pin as Input
+  
+  // Start with everything OFF
+  digitalWrite(PIN_RELAY_LED, RELAY_OFF); 
+  digitalWrite(PIN_RELAY_PUMP, RELAY_OFF);
+
+  Blynk.begin(BLYNK_AUTH_TOKEN, ssid, pass);
+  timer.setInterval(1000L, myTimerEvent);
+}
+
+void loop()
+{
+  Blynk.run();
+  timer.run();
+}
