@@ -1,0 +1,86 @@
+/* FILL IN YOUR TEMPLATE INFO HERE */
+#define BLYNK_TEMPLATE_ID   "TMPL6fSzjY-CY"
+#define BLYNK_TEMPLATE_NAME "Smart Garden Reset"
+#define BLYNK_AUTH_TOKEN    "LNI6Szfb9ilZ991T-m6lr-uEkSRcmife"
+
+#define BLYNK_PRINT Serial
+#include <WiFi.h>
+#include <BlynkSimpleEsp32.h>
+
+char ssid[] = "vivo Y36 5";
+char pass[] = "oado200693";
+
+// --- PINS ---
+#define PIN_RELAY 26       // Relay controls the External LED
+#define PIN_LDR 34        // LDR Sensor
+
+// --- SETTINGS ---
+// Threshold: Adjust this number! 
+// 4095 = Very Bright, 0 = Pitch Black.
+// We set it to 2000. If it goes LOWER than this (Darker), light turns on.
+int threshold = 2000;     
+
+bool systemArmed = false; // System starts disabled
+
+// ⚠️ RELAY SETTINGS
+// Check your relay type. If LED works backward, swap HIGH and LOW here.
+int RELAY_ON = HIGH;      
+int RELAY_OFF = LOW;
+
+BlynkTimer timer;
+
+// --- AUTOMATION LOOP ---
+void myTimerEvent()
+{
+  int ldrValue = analogRead(PIN_LDR); 
+  Blynk.virtualWrite(V0, ldrValue); 
+
+  Serial.print("Light Level: ");
+  Serial.print(ldrValue);
+  Serial.print(" | System Armed: ");
+  Serial.println(systemArmed);
+
+  // --- THE NEW LOGIC (DARK DETECT) ---
+  // If System is ON ... AND ... Value is LESS than threshold (Dark)
+  if (systemArmed == true && ldrValue < threshold) 
+  {
+    digitalWrite(PIN_RELAY, RELAY_ON);
+    Serial.println(" -> It is DARK! Turning LED ON.");
+  } 
+  else 
+  {
+    digitalWrite(PIN_RELAY, RELAY_OFF);
+    Serial.println(" -> It is Bright (or System OFF). LED OFF.");
+  }
+}
+
+// --- BUTTON V2: SYSTEM ENABLE/DISABLE ---
+BLYNK_WRITE(V2)
+{
+  int btnValue = param.asInt();
+  
+  if (btnValue == 1) {
+    systemArmed = true;
+  } else {
+    systemArmed = false;
+  }
+}
+
+void setup()
+{
+  Serial.begin(9600);
+  
+  pinMode(PIN_RELAY, OUTPUT);
+  pinMode(PIN_LDR, INPUT);
+  
+  digitalWrite(PIN_RELAY, RELAY_OFF); 
+
+  Blynk.begin(BLYNK_AUTH_TOKEN, ssid, pass);
+  timer.setInterval(1000L, myTimerEvent);
+}
+
+void loop()
+{
+  Blynk.run();
+  timer.run();
+}
