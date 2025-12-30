@@ -11,7 +11,7 @@ char ssid[] = "vivo Y36 5";
 char pass[] = "oado200693";
 
 // --- PINS ---
-#define PIN_RELAY_LED   4    // Relay 1: Controls Grow Light (Old Pin)
+#define PIN_RELAY_LED   26   // Relay 1: Controls Grow Light (Old Pin)
 #define PIN_RELAY_PUMP  27   // Relay 2: Controls Water Pump (NEW Pin!)
 #define PIN_LDR         34   // LDR Sensor
 #define PIN_MOISTURE    35   // Moisture Sensor
