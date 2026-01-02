@@ -1,0 +1,147 @@
+/* FILL IN YOUR TEMPLATE INFO HERE */
+#define BLYNK_TEMPLATE_ID   "TMPL6fSzjY-CY"
+#define BLYNK_TEMPLATE_NAME "Smart Garden Auto"
+#define BLYNK_AUTH_TOKEN    "LNI6Szfb9ilZ991T-m6lr-uEkSRcmife"
+
+#define BLYNK_PRINT Serial
+#include <WiFi.h>
+#include <BlynkSimpleEsp32.h>
+
+char ssid[] = "vivo Y36 5";
+char pass[] = "oado200693";
+
+// --- PINS ---
+#define PIN_RELAY_LED    26   // Relay 1: Grow Light
+#define PIN_RELAY_PUMP   27   // Relay 2: Water Pump
+#define PIN_RELAY_HEAT   25   // Relay 3: Heating Pad
+
+#define PIN_LDR          34   // LDR Sensor (Input)
+#define PIN_MOISTURE     35   // Moisture Sensor (Input)
+#define PIN_GAS          33   // Gas Sensor (Input)
+
+// --- SETTINGS ---
+int lightThreshold = 1300;   // < 1300 (Dark) -> Light ON
+int dryThreshold = 3000;     // > 3000 (Dry)  -> Pump ON
+int gasThreshold = 2500;     // > 2500 -> Gas Warning
+
+// --- RELAY LOGIC (FIXED) ---
+int RELAY_ON = HIGH;      
+int RELAY_OFF = LOW;
+
+// --- VARIABLES ---
+bool pumpMasterSwitch = false; // Starts OFF (Pump is disabled by default)
+
+BlynkTimer timer;
+
+// --- AUTOMATION LOOP (Runs every 1 second) ---
+void myTimerEvent()
+{
+  // 1. Read Sensors
+  int ldrValue = analogRead(PIN_LDR);
+  int moistureValue = analogRead(PIN_MOISTURE);
+  int gasValue = analogRead(PIN_GAS); 
+
+  // 2. Send Data to App
+  Blynk.virtualWrite(V0, ldrValue);      
+  Blynk.virtualWrite(V4, moistureValue); 
+  Blynk.virtualWrite(V7, gasValue);      
+
+  Serial.print("Light: "); Serial.print(ldrValue);
+  Serial.print(" | Soil: "); Serial.print(moistureValue);
+  Serial.print(" | Gas: "); Serial.println(gasValue);
+
+  // --- JOB A: LIGHT CONTROL (Auto) ---
+  if (ldrValue < lightThreshold) {
+    digitalWrite(PIN_RELAY_LED, RELAY_ON);
+    Serial.println(" -> Dark: LED ON");
+  } else {
+    digitalWrite(PIN_RELAY_LED, RELAY_OFF);
+    Serial.println(" -> Bright: LED OFF");
+  }
+
+  // --- JOB B: PUMP CONTROL (With Master Switch Logic) ---
+  
+  // 1. Check if the Master Switch (V8) is ON
+  if (pumpMasterSwitch == true) 
+  {
+    // Switch is ON, so we check the Soil Sensor
+    if (moistureValue > dryThreshold) {
+      digitalWrite(PIN_RELAY_PUMP, RELAY_ON);
+      Serial.println(" -> Soil Dry: PUMP ON");
+    } else {
+      digitalWrite(PIN_RELAY_PUMP, RELAY_OFF);
+      Serial.println(" -> Soil Wet: PUMP OFF");
+    }
+  } 
+  else 
+  {
+    // Switch is OFF, so we force the Pump OFF (Safety)
+    digitalWrite(PIN_RELAY_PUMP, RELAY_OFF);
+    Serial.println(" -> Pump Disabled (Master Switch OFF)");
+  }
+  
+  // --- JOB C: GAS MONITORING ---
+  if (gasValue > gasThreshold) {
+    Serial.println(" -> ⚠️ WARNING: High Gas Detected!");
+  }
+}
+
+// --- JOB D: MANUAL HEATER CONTROL (Button V6) ---
+BLYNK_WRITE(V6)
+{
+  int btnValue = param.asInt(); 
+  if (btnValue == 1) {
+    digitalWrite(PIN_RELAY_HEAT, RELAY_ON); 
+    Serial.println(" -> Manual: HEATER ON");
+  } else {
+    digitalWrite(PIN_RELAY_HEAT, RELAY_OFF); 
+    Serial.println(" -> Manual: HEATER OFF");
+  }
+}
+
+// --- NEW! JOB E: PUMP MASTER SWITCH (Button V8) ---
+BLYNK_WRITE(V8)
+{
+  int btnValue = param.asInt();
+  
+  if (btnValue == 1) {
+    pumpMasterSwitch = true;
+    Serial.println("PUMP SYSTEM: ENABLED");
+  } else {
+    pumpMasterSwitch = false;
+    Serial.println("PUMP SYSTEM: DISABLED");
+    // Safety: Turn pump off immediately if disabled
+    digitalWrite(PIN_RELAY_PUMP, RELAY_OFF); 
+  }
+}
+
+void setup()
+{
+  Serial.begin(9600);
+  
+  pinMode(PIN_RELAY_LED, OUTPUT);
+  pinMode(PIN_RELAY_PUMP, OUTPUT);
+  pinMode(PIN_RELAY_HEAT, OUTPUT); 
+  
+  pinMode(PIN_LDR, INPUT);
+  pinMode(PIN_MOISTURE, INPUT);
+  pinMode(PIN_GAS, INPUT); 
+  
+  // Start with everything OFF
+  digitalWrite(PIN_RELAY_LED, RELAY_OFF); 
+  digitalWrite(PIN_RELAY_PUMP, RELAY_OFF);
+  digitalWrite(PIN_RELAY_HEAT, RELAY_OFF);
+
+  Blynk.begin(BLYNK_AUTH_TOKEN, ssid, pass);
+  timer.setInterval(1000L, myTimerEvent);
+  
+  // Reset Buttons to OFF when ESP starts
+  Blynk.virtualWrite(V6, 0); // Heater
+  Blynk.virtualWrite(V8, 0); // Pump Master Switch
+}
+
+void loop()
+{
+  Blynk.run();
+  timer.run();
+}
